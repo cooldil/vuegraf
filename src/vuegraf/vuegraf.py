@@ -4,7 +4,7 @@ __author__ = 'https://github.com/jertel'
 __license__ = 'MIT'
 __contributors__ = 'https://github.com/jertel/vuegraf/graphs/contributors'
 __version__ = '1.7.2'
-__versiondate__ = '2024/02/25'
+__versiondate__ = '2024/12/21'
 __maintainer__ = 'https://github.com/jertel'
 __github__ = 'https://github.com/jertel/vuegraf'
 __status__ = 'Production'
@@ -152,7 +152,7 @@ def extractDataPoints(device, usageDataPoints, pointType=None, historyStartTime=
         if kwhUsage is not None:
             if pointType is None:
                 watts = float(minutesInAnHour * wattsInAKw) * kwhUsage
-                timestamp = stopTime
+                timestamp = stopTime.replace(second=0)
                 usageDataPoints.append(createDataPoint(account, chanName, watts, timestamp, False))
             elif pointType == 'Day' or pointType == 'Hour' :
                 watts = kwhUsage * 1000
@@ -166,25 +166,27 @@ def extractDataPoints(device, usageDataPoints, pointType=None, historyStartTime=
             # Collect seconds (once per hour, never during history collection)
             verbose('Get second details; device="{}"; start="{}"; stop="{}"'.format(chanName, detailedStartTime, stopTime ))
             usage, usage_start_time = account['vue'].get_chart_usage(chan, detailedStartTime, stopTime, scale=Scale.SECOND.value, unit=Unit.KWH.value)
+            usage_start_time = usage_start_time.replace(microsecond=0)
             index = 0
             for kwhUsage in usage:
                 if kwhUsage is None:
                     continue
-                timestamp = detailedStartTime + datetime.timedelta(seconds=index)
+                timestamp = usage_start_time + datetime.timedelta(seconds=index)
                 watts = float(secondsInAMinute * minutesInAnHour * wattsInAKw) * kwhUsage
                 usageDataPoints.append(createDataPoint(account, chanName, watts, timestamp, True))
                 index += 1
 
-        # fetches historical minute data
+        # fetches historical Hour and Day data
         if historyStartTime is not None and historyEndTime is not None:
             verbose('Get historic details; device="{}"; start="{}"; stop="{}"'.format(chanName, historyStartTime,historyEndTime ))
             #Hours
             usage, usage_start_time = account['vue'].get_chart_usage(chan, historyStartTime, historyEndTime, scale=Scale.HOUR.value, unit=Unit.KWH.value)
+            usage_start_time = usage_start_time.replace(minute=0, second=0, microsecond=0)
             index = 0
             for kwhUsage in usage:
                 if kwhUsage is None:
                     continue
-                timestamp = historyStartTime + datetime.timedelta(hours=index)
+                timestamp = usage_start_time + datetime.timedelta(hours=index)
                 watts = kwhUsage * 1000
                 usageDataPoints.append(createDataPoint(account, chanName, watts, timestamp, 'Hour'))
                 index += 1
@@ -194,14 +196,14 @@ def extractDataPoints(device, usageDataPoints, pointType=None, historyStartTime=
             for kwhUsage in usage:
                 if kwhUsage is None:
                     continue
-                timestamp = historyStartTime + datetime.timedelta(days=index-1)
+                timestamp = usage_start_time.astimezone(accountTimeZone) #+ datetime.timedelta(days=index-1)
                 timestamp = timestamp.replace(hour=23, minute=59, second=59,microsecond=0)
                 timestamp = timestamp.astimezone(pytz.UTC)
                 watts =   kwhUsage * 1000
                 usageDataPoints.append(createDataPoint(account, chanName, watts, timestamp, 'Day'))
                 index += 1
 
-startupTime = datetime.datetime.now(datetime.UTC)
+startupTime = datetime.datetime.now(datetime.UTC).replace(microsecond=0)
 try:
     #argparse includes default -h / --help as command line input
     parser = argparse.ArgumentParser(
@@ -317,7 +319,7 @@ try:
 
     while running:
         usageDataPoints = []
-        now = datetime.datetime.now(datetime.UTC)
+        now = datetime.datetime.now(datetime.UTC).replace(microsecond=0)
         curDay = datetime.datetime.now(accountTimeZone)
         stopTime = now - datetime.timedelta(seconds=lagSecs)
         secondsSinceLastDetailCollection = (stopTime - detailedStartTime).total_seconds()
@@ -359,6 +361,7 @@ try:
                     pastDay = pastDay.replace(hour=23, minute=59, second=00, microsecond=0)
 
                 if history:
+                    stopTime = stopTime.astimezone(accountTimeZone)
                     info('Loading historical data: {} day(s) ago'.format(historyDays))
                     historyStartTime = stopTime - datetime.timedelta(historyDays)
                     historyStartTime = historyStartTime.replace(hour=00, minute=00, second=00, microsecond=000000)
