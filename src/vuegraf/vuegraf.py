@@ -196,7 +196,7 @@ def extractDataPoints(device, usageDataPoints, pointType=None, historyStartTime=
             for kwhUsage in usage:
                 if kwhUsage is None:
                     continue
-                timestamp = usage_start_time.astimezone(accountTimeZone) #+ datetime.timedelta(days=index-1)
+                timestamp = usage_start_time.astimezone(accountTimeZone) + datetime.timedelta(days=index)
                 timestamp = timestamp.replace(hour=23, minute=59, second=59,microsecond=0)
                 timestamp = timestamp.astimezone(pytz.UTC)
                 watts =   kwhUsage * 1000
