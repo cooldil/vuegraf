@@ -12,7 +12,7 @@ from pyemvue.enums import Scale, Unit
 
 from vuegraf.config import getConfigValue, getInfluxTag
 from vuegraf.device import lookupDeviceName, lookupChannelName
-from vuegraf.influx import getLastDBTimeStamp
+from vuegraf.influx import getLastDBTimeStamp, writeInfluxPoints
 from vuegraf.time import calculateHistoryTimeRange, convertToLocalDayInUTC
 
 
@@ -221,6 +221,10 @@ def collectHistoryUsage(config, account, startTimeUTC, stopTimeUTC, usageDataPoi
         for gid, device in usages.items():
             extractDataPoints(config, account, device, stopTimeUTC, False, usageDataPoints, None,
                               'History', incrementStartTimeUTC, incrementEndTimeUTC)
+
+        # Write batch datapoints to DB
+        writeInfluxPoints(config, usageDataPoints)
+        usageDataPoints = []
 
         historicBatchCounter = historicBatchCounter + 1
 
