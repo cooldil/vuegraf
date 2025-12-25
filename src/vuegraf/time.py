@@ -46,7 +46,21 @@ def calculateHistoryTimeRange(config, nowLagUTC, startTimeUTC, historyIncrements
 
     startTimeUTC = startTimeLocal.astimezone(datetime.UTC)
 
-    stopTimeUTC = startTimeUTC + datetime.timedelta(days=historySizeDays - 1)
+    # Check to see if Timerange includes a DST transition
+    # DST offset for start of Timerange
+    startTimeLocal_dstOffset = startTimeUTC.astimezone(timezone).dst()
+    # DST offset for end of Timerange
+    stopTimeLocal_dstOffset = (startTimeUTC + datetime.timedelta(days=historySizeDays)).astimezone(timezone).dst()
+    # Difference in seconds for the DST offsets
+    dstOffset_Seconds = (86400 * (stopTimeLocal_dstOffset - startTimeLocal_dstOffset).days) + (stopTimeLocal_dstOffset - startTimeLocal_dstOffset).seconds
+
+    # Adjust the stopTime based on the DST offset (no change, negative or positive)
+    # No DST transistion OR DST transistion where time moved ahead
+    if dstOffset_Seconds >= 0:  
+        stopTimeUTC = startTimeUTC + datetime.timedelta(days=historySizeDays - 1)
+    else: # DST transistion where time moved back
+        stopTimeUTC = startTimeUTC + datetime.timedelta(days=historySizeDays)
+
     stopTimeUTC = stopTimeUTC.astimezone(timezone).replace(hour=23, minute=59, second=59, microsecond=0).astimezone(datetime.UTC)
     stopTimeUTC = min(stopTimeUTC, nowLagUTC)
 
